@@ -56,10 +56,13 @@ function main()
     """
         sim(;criteria)
 
-    Finds path between all OD pairs minimizing the expected value of the given criteria
+    Simulates path minimizing the expected value of the given criteria between all OD pairs
 
-    ### Arguments
+    # Arguments
     - `criteria::String`    : one of TD, TT, FC, CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ, TC, GHG, CP
+
+    # Example
+    - `sim(criteria = "TT")` returns simulated paramters for fastest paths between OD pairs
     """
     function sim(;criteria)
         X = [Array{Float64,1}[] for _ in 1:length(ODs)]   # Simulated data from ssp
@@ -68,7 +71,7 @@ function main()
             Z, _, _ = ssp(r, s, network=network, parameter=C₂P[criteria], numsims=1000)
             append!(X[k], Z)
         end
-        save(joinpath(@__DIR__, "Results\\$loc\\$loc - $criteria - HCT.jld"), "X", X)
+        save(joinpath(@__DIR__, "Results\\$loc - $criteria.jld"), "X", X)
     end
 
 
@@ -77,16 +80,20 @@ function main()
     """
         measure(parameters; criteria, metric, weighted=false)
 
-    Returns metric on parameter from parameters for paths established for given criteria 
+    Returns metric on parameter from parameters for paths minimizing expected value for given criteria 
         
-    ### Arguments
-    - `parameters::Array{String,1}`  : vector on TD, TT, FC, CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ, TC, GHG, CP
+    # Arguments
+    - `parameters::Array{String,1}`  : susbset of TD, TT, FC, CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ, TC, GHG, CP
     - `criteria::String`             : one of TD, TT, FC, CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ, TC, GHG, CP
     - `metric::function`             : statistical function (mean, var, iqr, idr, cv etc.)
     - `weighted::Bool=false`         : if true results are weighted by demand between OD pairs
+
+    # Example
+    - `measure(["TT"], criteria="CO₂", metric=mean)` returns mean travel time path minimizing expected carbon dioxide
+      emissions between all OD pairs.
     """
     function measure(parameters; criteria, metric, weighted=false)
-        X = load(joinpath(@__DIR__, "Results\\SP\\$loc\\$loc - $criteria.jld"))["X"]
+        X = load(joinpath(@__DIR__, "Results\\$loc - $criteria.jld"))["X"]
         for parameter ∈ parameters
             Y = [0.0 for _ in 1:length(ODs)]
             w = [0.0 for _ in 1:length(ODs)]
@@ -99,22 +106,28 @@ function main()
                 Y[k] = metric(Z)
                 w[k] = weighted ? Q[k] : 1.0
             end
-            println("$metric($parameter) on least $criteria path: ", (mean(Y), weights(w)))
+            println("$metric($parameter) on least $criteria path: ", (mean(Y, weights(w))))
         end
     end
+
+
 
     # Δ plots ────────────────────────────────────────────────────────────────────────────────
     """
         Δ(parameter; criteria₁, criteria₂, metric, weighted=false)
 
-    Returns %change in parameter metric value in criteria₂ paths relative to criteria₁ paths 
+    Returns %change in parameter's metric value for paths minimizing expected value for criteria₁ and criteria₂
 
-    ### Arguments
+    # Arguments
     - `parameter::String`       : one of TD, TT, FC, CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ, TC, GHG, CP
     - `criteria₁::String`       : one of TD, TT, FC, CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ, TC, GHG, CP
     - `criteria₂::String`       : one of TD, TT, FC, CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ, TC, GHG, CP
     - `metric::function`        : statistical function (mean, var, iqr, idr, cv etc.)
     - `weighted::Bool=false`    : if true results are weighted by demand between OD pairs
+    
+    # Example
+    - `Δ("CO₂", criteria₁="TD", crieteria₂="TT", metric=mean)` returns % change in mean carbon dioxide emissions on 
+      the shortest and fastest path between all OD pairs.
     """
     function Δ(parameter; criteria₁, criteria₂, metric, weighted=false)
         X₁ = load(joinpath(@__DIR__, "Results\\$loc - $criteria₁.jld"))["X"]
@@ -143,18 +156,24 @@ function main()
     """
         distributeΔ(parameter; criteria₁, criteria₂, ODpair)
     
-    Absolute distribution of the parameter given OD pair and path criteria
+    Distribution of the parameter on path minimizing expected value for criteria₁ and criteria₂ between a given OD pair
 
-    ### Arguments
+    # Arguments
     - `parameter::String`    : one of TD, TT, FC, CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ, TC, GHG, CP
     - `criteria₁::String`    : one of TD, TT, FC, CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ, TC, GHG, CP
     - `criteria₂::String`    : one of TD, TT, FC, CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ, TC, GHG, CP
-    - `ODpair::Array{Int,1}` : Vector of OD pairs
+    - `ODpair::Array{Int,1}` : one of the OD pairs
+
+    # Example
+    - `distributeΔ("TT"; criteria₁="CO₂", criteria₂="NOₓ", ODpair=ODs[1])` returns distribution for travel time
+      on path minimizing expected CO₂ emissions and path minimizing expected NOₓ emissions for the first OD pair
+      in the list.
+
     """
     function distributeΔ(parameter; criteria₁, criteria₂, ODpair)
         k = findfirst(x -> (x == ODpair), ODs)
-        X₁ = load(joinpath(@__DIR__, "Results\\$loc\\$loc - $criteria₁.jld"))["X"]
-        X₂ = load(joinpath(@__DIR__, "Results\\$loc\\$loc - $criteria₂.jld"))["X"]
+        X₁ = load(joinpath(@__DIR__, "Results\\$loc - $criteria₁.jld"))["X"]
+        X₂ = load(joinpath(@__DIR__, "Results\\$loc - $criteria₂.jld"))["X"]
 
         Z₁, Z₂ = X₁[k], X₂[k]
         P₁ = [0.0 for _ in 1:1000]
@@ -173,7 +192,7 @@ function main()
         fig = histogram!(P₂, color=RGBA(127/255,31/255,94/255,100/255),
             normalize=:pdf, linewidth=0.1, linecolor=:white, label="")
         fig = vline!([mean(P₁)], color=RGBA(31/255,127/255,64/255), linewidth=2, label="")
-        fig = vline!([mean(P₂)], color=RGBA(64/255,31/255,127/255), linewidth=2, label="")
+        fig = vline!([mean(P₂)], color=RGBA(127/255,31/255,94/255), linewidth=2, label="")
         display(fig)
 
         # LCP: RGB 64, 31, 127
@@ -182,21 +201,27 @@ function main()
     end
 
     """
-        sprayΔ(X, Y; criteria₁, criteria₂, metric, weighted=false)
+        sprayΔ(parameter₁, parameter₂; criteria₁, criteria₂, metric, weighted=false)
 
-    Scatter plot of % Δmetric(Y) vs % Δmetric(X) between paths with different criteria
+    Scatter plot of % Δmetric(parameter₂) vs % Δmetric(parameter₁) where Δ represents the comparison 
+    between the path minimzing the expected value for criteria₁ and the path minimzing the expected 
+    value of criteria₂.
 
-    ### Arguments
-    - `X::String`               : one of TD, TT, FC, CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ, TC, GHG, CP
-    - `Y::String`               : one of TD, TT, FC, CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ, TC, GHG, CP
+    # Arguments
+    - `parameter₁::String`      : one of TD, TT, FC, CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ, TC, GHG, CP
+    - `parameter₂::String`      : one of TD, TT, FC, CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ, TC, GHG, CP
     - `criteria₁::String`       : one of TD, TT, FC, CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ, TC, GHG, CP
     - `criteria₂::String`       : one of TD, TT, FC, CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ, TC, GHG, CP
     - `metric::function`        : statistical function (mean, var, iqr, idr, cv etc.)
     - `weighted::Bool=false`    : if true, distribution is weighted by OD flows
+
+    # Example
+    - `sprayΔ("CO₂", "PM"; criteria₁="TD", criteria₂="TT", metric=mean)` returns %Δmean(PM) vs. %Δmean(CO₂) 
+       comparing shortest path with the fastest path between OD pairs.
     """
-    function sprayΔ(X, Y; criteria₁, criteria₂, metric, weighted=false)
-        X₁ = load(joinpath(@__DIR__, "Results\\$loc\\$loc - $criteria₁.jld"))["X"]
-        X₂ = load(joinpath(@__DIR__, "Results\\$loc\\$loc - $criteria₂.jld"))["X"]
+    function sprayΔ(parameter₁, parameter₂; criteria₁, criteria₂, metric, weighted=false)
+        X₁ = load(joinpath(@__DIR__, "Results\\$loc - $criteria₁.jld"))["X"]
+        X₂ = load(joinpath(@__DIR__, "Results\\$loc - $criteria₂.jld"))["X"]
 
         Δˣ, Δʸ = Float64[], Float64[]
         for (k, OD) in enumerate(ODs)
@@ -223,7 +248,7 @@ function main()
 
         ε = Δʸ./Δˣ
         filter!(x -> (!isnan(x)), ε)
-        println("Elasticity wrt $X")
+        println("Elasticity wrt $parameter₁")
         println("   ols: $(sum(Δʸ.*Δˣ)/sum(Δˣ.*Δˣ))")
         println("   avg₁: $(mean(ε))")
         println("   avg₂: $(mean(Δʸ)/mean(Δˣ))")
@@ -233,74 +258,64 @@ function main()
             color=RGBA(180/255,120/255,70/255), label="")
         fig = scatter!(Δˣ, Δʸ, color=RGBA(70/255,130/255,180/255,50/255),
             markersize=2.5, markerstrokewidth=0.1, label="",
-            xlab="% Δ$metric($X)", ylab="% Δ$metric($Y)",
+            xlab="% Δ$metric($parameter₁)", ylab="% Δ$metric($parameter₂)",
             tickfont="calibri", guidefont="calibri", legendfont="calibri")
         display(fig)
     end
 
-
+    
+    
     # Reliability plots ────────────────────────────────────────────────────────────────────────────────
     """
-        crossreliability(; criterion, parameter, reliability="parameter", weighted=false)
+        crossreliability(; criteria, parameter, weighted=false)
         
-    ???
+    Returns reliability for the parameter on path minimizing the expected value of the given criteria.
 
     ### Arguments
-    - `parameter::String`               : one of TD, TT, FC, CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ, TC, GHG, CP
-    - `criterion::Array{String, 1}`     : subset of TD, TT, FC, CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ, TC, GHG, CP
-    - `reliability::String`             : criterion or parameter
-    - `weighted::Bool=false`            : if true, returns results weighted by demand between OD pairs
+    - `criteria::String`        : one of TD, TT, FC, CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ, TC, GHG, CP
+    - `parameter::String`       : one of TD, TT, FC, CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ, TC, GHG, CP
+    - `weighted::Bool=false`    : if true, returns results weighted by demand between OD pairs
+
+    # Example
+    - `crossreliability(criterion="TT", parameter="CO₂", reliability="parameter")` returns CO₂ reliability on the 
+      simulated fastest paths between the  OD pairs.
     """
-    function crossreliability(; criterion, parameter, reliability="parameter", weighted=false)
-        Xₒ = load(joinpath(@__DIR__, "Results\\$loc\\$loc - $parameter.jld"))["X"]
-        𝐗 = []
-        for (i, criteria) in enumerate(criterion)
-            push!(𝐗, load(joinpath(@__DIR__, "Results\\$loc\\$loc - $criteria.jld"))["X"])
-        end
+    function crossreliability(; criteria, parameter, reliability="parameter", weighted=false)
+        X = load(joinpath(@__DIR__, "Results\\$loc - $criteria.jld"))["X"]
 
         l = -0.25
         u = 0.25
         pRange = l:(u-l)/100:u
 
-        𝐘 = [[[0.0 for _ in ODs] for _ in 0:100] for _ in criterion]
-        for (i, criteria) in enumerate(criterion)
-            if reliability == "criterion" x, X = criteria, Xₒ end
-            if reliability == "parameter" x, X = parameter, 𝐗[i] end
+        Y = [[0.0 for _ in ODs] for _ in 0:100]
+        
+        for (k, OD) in enumerate(ODs)
+            Z = X[k]
+            V = [0.0 for _ in 1:1000]
+            for p in C₂P[parameter]
+                j = findfirst(x -> (x == p), P)
+                V += Z[j] * ℿ[j]
+            end
 
-            for (k, OD) in enumerate(ODs)
-                Z = X[k]
-                P = [0.0 for _ in 1:1000]
-                for p in C₂P[x]
-                    j = findfirst(x -> (x == p), P)
-                    P += Z[j] * ℿ[j]
-                end
-
-                for (j, p) in enumerate(pRange)
-                    t = mean(P) * (p + 1)
-                    𝐘[i][j][k] = length(findall(x -> (x <= t), P))/length(P)
-                end
+            for (j, p) in enumerate(pRange)
+                t = mean(V) * (p + 1)
+                Y[j][k] = length(findall(x -> (x ≤ t), V))/length(V)
             end
         end
-        #legend = ["SP", "FP", "LCP", "LEP - $(criterion[1])"]
-        #rgba = [RGBA(127/255, 31/255, 94/255, 100/255), RGBA(127/255, 64/255, 31/255, 100/255),
-        #        RGBA(64/255, 31/255, 127/255, 100/255), RGBA(31/255, 127/255, 64/255, 100/255)]
-        legend = ["SP", "LEP - $(criterion[2])", "LEP - $(criterion[3])", "LEP - $(criterion[4])",
-                "LEP - $(criterion[5])", "LEP - $(criterion[6])", "LEP - $(criterion[7])"]
 
         w = [if weighted Q[i] else 1.0 end for i in 1:length(Q)]
         fig = plot(xlab="% deviation from the avg. $(C₂L[parameter])",
             ylab="$parameter reliability")
         fig = plot!(tickfont=(14,"calibri"), guidefont=(16,"calibri"),
             legendfont=(16,"calibri"), legend=(0.75, 0.8))
-        for (k, Y) in enumerate(𝐘)
-            fig = plot!(pRange.*100, [mean(y, weights(w)) for y in Y],
-                label=legend[k], color=palette(:Paired_7)[k], linewidth=2.5,
-                ylims=(0,1), yticks=0:0.2:1.0)
-        end
+        
+        fig = plot!(pRange.*100, [mean(y, weights(w)) for y in Y],
+            label="", linewidth=2.5, ylims=(0,1), yticks=0:0.2:1.0)
         display(fig)
     end
 
 
+    
     # Cost-Benefit analysis ────────────────────────────────────────────────────────────────────────────────
     """
         costbenefit(cost, pollutant, weighted=false)
@@ -308,14 +323,19 @@ function main()
     Returns log₁₀(Cost/Benefit) value
     Returns ΔC [\$] vs. Δpollutant-cost [\$] scatter plot and ΔC/Δpollutant-cost histogram
 
-    ### Arguments
+    # Arguments
     - `cost::String`            : one of TD, TT, TC
     - `pollutant::String`       : one of CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ, TC, GHG, CP
     - `weighted::Bool=false`    : if true, returns results weighted by demand between OD pairs
+    
+    # Example
+    - `costbenefit("TT", "CO₂")` returns cost benefit value comparing fastest path with path 
+      minimizing expected CO₂ emissions, with cost being increase in travel time and benefits 
+      being reduction in CO₂ emissions owing to eco-routing for the pollutant.
     """
     function costbenefit(cost, pollutant; weighted=false)
-        X₁ = load(joinpath(@__DIR__, "Results\\$loc\\$loc - $pollutant.jld"))["X"]
-        X₂ = load(joinpath(@__DIR__, "Results\\$loc\\$loc - $cost.jld"))["X"]
+        X₁ = load(joinpath(@__DIR__, "Results\\$loc - $pollutant.jld"))["X"]
+        X₂ = load(joinpath(@__DIR__, "Results\\$loc - $cost.jld"))["X"]
 
 
         eᵢ = findfirst(x -> (x == C₂P[pollutant][1]), P)
@@ -328,7 +348,7 @@ function main()
 
             Cᵉ = 0.0
             Cᶜ = 0.0
-            for p in parameterize[cost]
+            for p in C₂P[cost]
                 i = findfirst(x -> (x == p), P)
                 Cᵉ += mean(Zᵉ[i] * ℿ[i])
                 Cᶜ += mean(Zᶜ[i] * ℿ[i])
@@ -338,13 +358,14 @@ function main()
             append!(Δᶜ, Cᵉ - Cᶜ)
         end
 
-        w = [if weighted Q[i] else 1.0 end for i in 1:length(Q)]
+        w = [if weighted Q[i] else 1.0 end for i in 1:length(ODs)]
         Z = [Δᶜ[k]/Δᵉ[k] for k in 1:length(ODs)]
         index = findall(x -> (x ≥ 0), Z)
         Z = Z[index]
         w = w[index]
+        Δᶜ= Δᶜ[index]
+        Δᵉ= Δᵉ[index]
         println("Cost-Benefit: ", mean(log10.(Z), weights(w)))
-
 
         fig = plot(Δᵉ, [Δ*sum(w.*Δᶜ.*Δᵉ)/sum(w.*Δᵉ.*Δᵉ) for Δ in Δᵉ], linewidth=2,
             color=RGBA(180/255,120/255,70/255), label="Avg. Cost/Benefit")
@@ -367,24 +388,32 @@ function main()
     end
 
 
+
     # Proximity analysis ────────────────────────────────────────────────────────────────────────────────
     """
         proximity_analysis(; pollutants, criteria)
     
-    Returns a scatter plot for % Δpollutant vs. shortest path travel distance between origin-destination
-    and a scatter plot for % Δpollutant vs. fastest path travel time between origin-destination
+    Returns scatter plot for % Δpollutant vs. shortest path travel distance between origin-destination 
+    (spatial distance) and a scatter plot for % Δpollutant vs. fastest path travel time between origin-
+    destination (temporal distance). Δ represents comparison of shortest or fastest path with the path 
+    minimizing expected value of the criteria.
 
-    ### Arguments
+    # Arguments
     - `pollutants::Array{String,1}` : subset of CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ, TC, GHG, CP
     - `criteria::String`            : one of TD, TT, FC, CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ, TC, GHG, CP
+
+    # Example
+    - `proximity_analysis(pollutants=["CO₂"], criteria="TC")` returns %change in CO₂ emissions between shortest/fastest
+       and least cost path between the OD pairs, plotted against the minimum travel distance/time between these origin-
+       destination pairs
     """
     function proximity_analysis(;pollutants, criteria)
-        Xₒ = load(joinpath(@__DIR__, "Results\\$loc\\$loc - $criteria.jld"))["X"]
-        Xᵈ = load(joinpath(@__DIR__, "Results\\$loc\\$loc - TD.jld"))["X"]
-        Xᵗ = load(joinpath(@__DIR__, "Results\\$loc\\$loc - TT.jld"))["X"]
+        Xₒ = load(joinpath(@__DIR__, "Results\\$loc - $criteria.jld"))["X"]
+        Xᵈ = load(joinpath(@__DIR__, "Results\\$loc - TD.jld"))["X"]
+        Xᵗ = load(joinpath(@__DIR__, "Results\\$loc - TT.jld"))["X"]
         𝐗 = []
         for (i, pollutant) in enumerate(pollutants)
-            push!(𝐗, load("Network\\$networkName\\analysis\\$loc\\$loc - $pollutant.jld")["X"])
+            push!(𝐗, load(joinpath(@__DIR__, "Results\\$loc - $pollutant.jld"))["X"])
         end
 
         D = Float64[]
@@ -408,7 +437,7 @@ function main()
         fig = plot()
         for (i, pollutant) in enumerate(pollutants)
             X = 0:1:Int(ceil(maximum(D)))
-            Y = [mean(Δ[i][findall(x -> (X[j-1] < x <= X[j]), D)]) for j in 2:length(X)]
+            Y = [mean(Δ[i][findall(x -> (X[j-1] < x ≤ X[j]), D)]) for j in 2:length(X)]
             fig = plot!(X[2:end], Y, label=pollutant)
         end
         display(fig)
@@ -416,22 +445,14 @@ function main()
         fig = plot()
         for (i, pollutant) in enumerate(pollutants)
             X = 0:1/60:Int(ceil(maximum(T)))
-            Y = [mean(Δ[i][findall(x -> (X[j-1] < x <= X[j]), T)]) for j in 2:length(X)]
+            Y = [mean(Δ[i][findall(x -> (X[j-1] < x ≤ X[j]), T)]) for j in 2:length(X)]
             fig = plot!(X[2:end], Y, label=pollutant)
         end
         display(fig)
     end
     # ────────────────────────────────────────────────────────────────────────────────
-
-    pmt  = "TC"    
-    c₁   = "TT"
-    c₂   = "ROG"
-    Δ(pmt; criteria₁=c₁, criteria₂=c₂, metric=mean, weighted=true)
+    
+    
+    return
 end
 main()
-
-#= ────────────────────────────────────────────────────────────────────────────────
-# TODO: 
-1. Complete doc strings of some unfinished functions
-2. Update file directories
-──────────────────────────────────────────────────────────────────────────────── =#
