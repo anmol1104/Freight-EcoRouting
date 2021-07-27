@@ -8,6 +8,7 @@ Random.seed!(1104)
 
 """
     traffic_assignment(;network, assignment=:UE, tol=1e-5, maxiters=20, maxruntime=600, log=:on)
+    
 multi-class Traffic Assignment by Paired Alternative Segments (iTAPAS) algorithm
 Returns output.csv file with arc flows and arc costs for each vehicle class
 Returns report.csv file summarzing iteration-wise total flow, total cost, relative gap and run time
@@ -24,12 +25,12 @@ Returns report.csv file summarzing iteration-wise total flow, total cost, relati
 - Continuously differentiable
 
 ### Arguments
-- `network`::String             : network (availabe at: https://github.com/anmol1104/Freight-EcoRouting/src/TA/network)
-- `assignment`::Symbol=:UE      : User Equilibrium (UE) or System Optimal (SO) assigment
-- `tol`::Float=1e-5             : tolerance level for relative gap convergence
-- `maxiters`::Integer=20        : maximum number of iterations
-- `maxruntime`::Integer=600     : maximum wall clock run time (s)
-- `log`::Symbol=:on             : shows results for every iteration if log is on
+- `network::String`             : network (availabe at: https://github.com/anmol1104/Freight-EcoRouting/src/TA/network)
+- `assignment::Symbol=:UE`      : User Equilibrium (UE) or System Optimal (SO) assigment
+- `tol::Float=1e-5`             : tolerance level for relative gap convergence
+- `maxiters::Integer=20`        : maximum number of iterations
+- `maxruntime::Integer=600`     : maximum wall clock run time (s)
+- `log::Symbol=:on`             : shows results for every iteration if log is on
 
 ### DataFiles (available at: https://github.com/anmol1104/Freight-EcoRouting/src/TA/network)
 - class   : Enlists coefficients of `fᵐ(v)` for each class
