@@ -1,2 +1,6 @@
 Manifest.toml
-Results/
+src/SP/Results/
+src/TA/Results/
+src/TA/emissioncost.jl
+src/TA/geofence.jl
+src/TA/marketpenetration.jl
