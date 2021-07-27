@@ -1,5 +1,4 @@
-
-https://zenodo.org/badge/doi/10.5281/zenodo.5140095.svg
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5140095.svg)](https://doi.org/10.5281/zenodo.5140095)
 
 # Freight Eco-Routing
 This repo contains pertinent files for the analyses performed in "Can eco-routing be a stop-gap as freight mobility transitions to zero tail-pipe emissions. Jaller and Pahwa. Under Review". This analyses requires two tools,
