@@ -5,37 +5,37 @@ using Statistics
 using StatsBase
 using Distributions
 using Printf
-cd(@__DIR__)
 
 
 """
-    ssp(origin, destination[; networkName, parameter=["TT"], paradigm="expected value", distribution=Weibull(), threshold=1, leastcount=1/1000, η=100, showPath=false])
+    ssp(origin, destination[; network], parameter=["TT"], paradigm="expected value", distribution=Weibull(), threshold=1.0, leastcount=1/1000, numsims=100, showpath=false)
 
-For a given paradigm, engine modes to operate in and parameters for the cost function, ssp performs η simulations 
-for a vehicle traveling between origin-destination.
+For a given paradigm, engine modes to operate in and parameters for the cost function, ssp performs numsims simulations for a vehicle traveling between origin-destination
+and returns simulated travel statisitcs for travel distance, travel time, fuel consumed and emissions.
 
-# Arguments
-- `origin`::Integer                                 : Origin node
-- `destination`::Integer                            : Destination node
-- `networkName`::String                             : network
-- `parameter`::Array{String}                        : distance (TD), time (TT), energy (FC), emissions (CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ)
-- `paradigm`::String='expected value'               : determnistic, expected value, variance, reliability
-- `threshold`::Float                                : threshold cost for reliability analysis
-- `leastcount`::Float64                             : smallest value of discretized cost
-- `distribution`::UnivariateDistribution            : link speed distribution function
-- `η`::Integer                                      : Number of simulations
-- `showPath`::Bool                                  : if true shows every path simulated
+### Arguments
+- `origin::Integer`                                 : origin node
+- `destination::Integer`                            : destination node
+- `network::String`                                 : network
+- `parameter::Array{String}=["TT"]`                 : distance (TD), time (TT), energy (FC), emissions (CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ)
+- `paradigm::String="expected value"`               : determnistic, expected value, variance, reliability
+- `distribution::UnivariateDistribution=Weibull()`  : link speed distribution function
+- `threshold::Float64=1.0`                          : threshold cost for reliability analysis
+- `leastcount::Float64=1/1000`                      : smallest value of discretized cost
+- `numsims::Integer=100`                            : number of simulations
+- `showpath::Bool=false`                            : if true shows every path simulated
 
-# IO Units
+### IO Units
 - distance  : miles
 - energy    : litre of fuel
 - emissions : kg
 """
-function ssp(origin, destination; networkName, parameter=["TT"],
-    paradigm="expected value", distribution=Weibull(), threshold=1,
-    leastcount=1/1000, numSims=100, showPath=false)
+function ssp(origin, destination; network, parameter=["TT"],
+    paradigm="expected value", distribution=Weibull(), threshold=1.0,
+    leastcount=1/1000, numsims=100, showpath=false)
 
     printstyled("\n----- $paradigm - $(join(parameter, ", "))-----\n", color=:cyan)
+    dir = joinpath(@__DIR__, "Network\\$network")
 
     # Algorithm parameters
     r, s = origin, destination
@@ -65,8 +65,9 @@ function ssp(origin, destination; networkName, parameter=["TT"],
     function build()
         println("\nBuilding network...")
         # Coefficient file
-        coefFile = CSV.File("Network\\$networkName\\coef.csv")
-        df₁ = DataFrame(coefFile)
+        coefFile = joinpath(dir, "coef.csv")
+        csv₁ = CSV.File(coefFile)
+        df₁ = DataFrame(csv₁)
         for r in 1:nrow(df₁)
             p = df₁[r,1]::String
             push!(parameters, p)
@@ -78,8 +79,9 @@ function ssp(origin, destination; networkName, parameter=["TT"],
         end
 
         # Network file
-        networkFile = CSV.File("Network\\$networkName\\network.csv")
-        df₂ = DataFrame(networkFile)
+        ntwkFile = joinpath(dir, "network.csv")
+        csv₂ = CSV.File(ntwkFile)
+        df₂ = DataFrame(csv₂)
         head = df₂[!,1]::Array{Int64,1}
         tail = df₂[!,2]::Array{Int64,1}
         linkClass = df₂[!,3]::Array{Int64,1}
@@ -112,8 +114,8 @@ function ssp(origin, destination; networkName, parameter=["TT"],
 
         # Geofence file
         append!(γ, [[0 for j in A[i]] for i in N])
-        if "geofence.csv" in readdir("Network\\$networkName\\")
-            geofFile = "Network\\$networkName\\geofence.csv"
+        if "geofence.csv" in readdir(dir)
+            geofFile = joinpath(dir, "geofence.csv")
             csv₃ = CSV.File(geofFile)
             df₃ = DataFrame(csv₃)
             for r in 1:nrow(df₃)
@@ -261,12 +263,12 @@ function ssp(origin, destination; networkName, parameter=["TT"],
         L = Int(round(C̅/δ))
         X(v) = [v^y for x in 1:length(parameters) for y in 0:2]
 
-        paths = Array{Int64,1}[[] for _ in 1:numSims]
-        Z = [[0.0 for _ in 1:numSims] for _ in parameters]
-        C = [0.0 for _ in 1:numSims]
+        paths = Array{Int64,1}[[] for _ in 1:numsims]
+        Z = [[0.0 for _ in 1:numsims] for _ in parameters]
+        C = [0.0 for _ in 1:numsims]
 
         if paradigm == "deterministic"
-            for n in 1:numSims
+            for n in 1:numsims
                 Zₗ = [[[-1.0 for _ in 1:length(A[i])] for i in N] for _ in 1:length(parameters)]
                 Cₗ = [[-1.0 for _ in 1:length(A[i])] for i in N]
                 for i in N
@@ -294,7 +296,7 @@ function ssp(origin, destination; networkName, parameter=["TT"],
             @time Lᵣ, _ = djk(μ, r, "source")
             @time p = djkpath(Lᵣ, r, s)
             #ρ = reliability(p)
-            for n in 1:numSims
+            for n in 1:numsims
                 for m in 2:length(p)
                     i, j = p[m-1],  p[m]
                     k = findfirst(x -> (x == j), A[i])::Int64
@@ -312,7 +314,7 @@ function ssp(origin, destination; networkName, parameter=["TT"],
             @time Lᵣ, _ = djk(σ², r, "source")
             @time p = djkpath(Lᵣ, r, s)
             #ρ = reliability(p)
-            for n in 1:numSims
+            for n in 1:numsims
                 for m in 2:length(p)
                     i, j = p[m-1], p[m]
                     k = findfirst(x -> (x == j), A[i])::Int64
@@ -353,7 +355,7 @@ function ssp(origin, destination; networkName, parameter=["TT"],
             println("Algorithm run time")
             @time Lₛ, _ = djk(μ, s, "sink")
             @time ρ, λ = f()
-            for n in 1:numSims
+            for n in 1:numsims
                 i = r
                 append!(paths[n], i)
                 while i ≠ s
@@ -400,8 +402,8 @@ function ssp(origin, destination; networkName, parameter=["TT"],
         println(df)
 
         #if paradigm in ("expected value", "variance", "reliability") println("\nactual reliability: $(round(ρ[r][L + 1], digits=5))") else println("\nactual reliability: ", "NA") end
-        println("calculated reliability: $(round(length(findall(x -> (x ≤ C̅), C))/numSims, digits=5))")
-        if showPath
+        println("calculated reliability: $(round(length(findall(x -> (x ≤ C̅), C))/numsims, digits=5))")
+        if showpath
             println("\nPaths:")
             for path in uniquePaths println("   Path => $path") end
             println("Path count: $pathCount")
