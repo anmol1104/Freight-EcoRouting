@@ -1,18 +1,16 @@
 using DataFrames
 using CSV
 using Random
-using Calculus
 using Printf
 using StatsBase
 using Dates
-using JLD
-Random.seed!(1403)
+Random.seed!(1104)
 
 """
-    traffic_assignment(;networkName[, assignment, initialSol, tol, maxIters, maxRunTime, log])
-
-improved Traffic Assignment by Paired Alternative Segments (iTAPAS) algorithm for static multi-class 
-traffic assignment problem with generalized link cost function.
+    traffic_assignment(;network, assignment=:UE, tol=1e-5, maxiters=20, maxruntime=600, log=:on)
+multi-class Traffic Assignment by Paired Alternative Segments (iTAPAS) algorithm
+Returns output.csv file with arc flows and arc costs for each vehicle class
+Returns report.csv file summarzing iteration-wise total flow, total cost, relative gap and run time
  
 ### Generalized link cost function: `cᵐᵢⱼ = fᵐ(vᵢⱼ)tᵢⱼ`
 - `cᵐᵢⱼ` : generalized link cost for link 𝑖𝑗 , vehicle class 𝑚
@@ -26,14 +24,14 @@ traffic assignment problem with generalized link cost function.
 - Continuously differentiable
 
 ### Arguments
-- `networkName`::String         : network from the repository https://github.com/anmol1104/TrafficAssignment
+- `network`::String             : network (availabe at: https://github.com/anmol1104/Freight-EcoRouting/src/TA/network)
 - `assignment`::Symbol=:UE      : User Equilibrium (UE) or System Optimal (SO) assigment
 - `tol`::Float=1e-5             : tolerance level for relative gap convergence
-- `maxIters`::Integer=20        : maximum number of iterations
-- `maxRunTime`::Integer=600     : maximum wall clock run time (s)
+- `maxiters`::Integer=20        : maximum number of iterations
+- `maxruntime`::Integer=600     : maximum wall clock run time (s)
 - `log`::Symbol=:on             : shows results for every iteration if log is on
 
-### DataFiles (available at: https://github.com/anmol1104/TrafficAssignment)
+### DataFiles (available at: https://github.com/anmol1104/Freight-EcoRouting/src/TA/network)
 - class   : Enlists coefficients of `fᵐ(v)` for each class
 - network : Details the topology of the network
 - demand  : Enlists OD pairs and corresponding demand for each class in passenger car equivalent (PCE)
@@ -45,9 +43,10 @@ traffic assignment problem with generalized link cost function.
 - mass    : kg
 - cost    : \$
 """
-function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20, maxRunTime=600, log=:on)
+function traffic_assignment(;network, assignment=:UE, tol=1e-5, maxiters=20, maxruntime=600, log=:on)
     println()
     printstyled("\niTAPAS Algorithm", color=:blue)
+    dir = joinpath(@__DIR__, "Network\\$network")
 
     # Algorithm parameters
     N   = Int64[]                               # Nodes
@@ -72,7 +71,7 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
     # Fetches betwork files and builds network related vectors
     function build()
         # class file
-        clssFile = "src\\TA\\Network\\$networkName\\class.csv"
+        clssFile = joinpath(dir,"class.csv")
         csv₁ = CSV.File(clssFile)
         df₁ = DataFrame(csv₁)
         for m in 1:nrow(df₁)
@@ -81,7 +80,7 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
         end
 
         # network file
-        ntwkFile = "src\\TA\\Network\\$networkName\\network.csv"
+        ntwkFile = joinpath(dir,"network.csv")
         csv₂ = CSV.File(ntwkFile, types=[Int64, Int64, Float64, Float64, Float64, Float64, Float64])
         df₂ = DataFrame(csv₂)
         head = df₂[!, 1]::Array{Int64,1}
@@ -116,8 +115,8 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
 
         # geofencing file
         for m in M push!(γ, [[0 for j in A[i]] for i in N]) end
-        if "geofence.csv" ∈ readdir("src\\TA\\Network\\$networkName\\")
-            geofFile = "src\\TA\\Network\\$networkName\\geofence.csv"
+        if "geofence.csv" ∈ readdir(dir)
+            geofFile = joinpath(dir,"geofence.csv")
             csv₃ = CSV.File(geofFile)
             df₃ = DataFrame(csv₃)
             for m in M
@@ -130,15 +129,15 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
             end
         end
 
-        # TODO: Add comments for demand file scrapping
         # demand file
-        dmndFile = "src\\TA\\Network\\$networkName\\demand.csv"
+        dmndFile = joinpath(dir,"demand.csv")
         csv₄ = CSV.File(dmndFile)
         df₄ = DataFrame(csv₄)
         origin = df₄[!, 1]::Array{Int64,1}
         destination = df₄[!, 2]::Array{Int64,1}
         flows = df₄[!, 3:ncol(df₄)]::DataFrame
         dict = Dict{Int64,Array{Int64,1}}(r => [r] for r in unique(origin))
+        # Making copies of origin nodes for every vehicle class
         for m in 2:length(M)
             for rₒ in unique(origin)
                 r = length(N) + 1
@@ -192,7 +191,7 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
             if t′ == Inf t′ = 1.0e6 end
             for k in 0:(length(η[m])-1) c += η[m][k+1] * v^k * (t + x * t′ * (1 - k)) end
         end
-        c = c * (1 + γ[m][i][k]*(1))
+        c = c * (1 + γ[m][i][k])
         return c
     end
 
@@ -227,7 +226,7 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
                 c′ += η[m][k+1] * v^k * (1-k) * (2t′ + x*(t′′ - k*(t′^2)/t))
             end
         end
-        c′ = c′ * (1 + γ[m][i][k]*(1))
+        c′ = c′ * (1 + γ[m][i][k])
         return c′
     end
 
@@ -504,7 +503,7 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
             end
             
             # Convergence Test
-            if log10(abs(rg)) ≤ log10(tol) || iter ≥ maxIters || wt ≥ maxRunTime break end
+            if log10(abs(rg)) ≤ log10(tol) || iter ≥ maxiters || wt ≥ maxruntime break end
             iter += 1
 
             ## Step 1
@@ -563,8 +562,8 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
             df₂ = DataFrame(ITER = [i for i in 1:length(report["TF"])],
                             TF = report["TF"], TC = report["TC"],
                             LOGRG = report["RG"], WT = report["WT"])
-            CSV.write("src\\TA\\Network\\$networkName\\output-$assignment.csv", df₁)
-            CSV.write("src\\TA\\Network\\$networkName\\report-$assignment.csv", df₂)
+            CSV.write(joinpath(dir,"output-$assignment.csv"), df₁)
+            CSV.write(joinpath(dir,"report-$assignment.csv"), df₂)
         end
         
         println("\n")
@@ -578,6 +577,3 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
     iTAPAS(1e-12, 1e-16, true)
 end
 # ────────────────────────────────────────────────────────────────────────────────
-
-traffic_assignment(networkName = "Chicago Sketch", tol=1e-12, maxIters=20, maxRunTime=900, log=:on)
-# TODO: Test against benchmarks from Xie, Nie and Liu (2018) - A greedy path based algorithm
