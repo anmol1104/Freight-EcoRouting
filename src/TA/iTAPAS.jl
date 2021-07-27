@@ -8,16 +8,16 @@ Random.seed!(1104)
 
 """
     traffic_assignment(;network, assignment=:UE, tol=1e-5, maxiters=20, maxruntime=600, log=:on)
-    
+
 multi-class Traffic Assignment by Paired Alternative Segments (iTAPAS) algorithm
 Returns output.csv file with arc flows and arc costs for each vehicle class
 Returns report.csv file summarzing iteration-wise total flow, total cost, relative gap and run time
  
-### Generalized link cost function: `cᵐᵢⱼ = fᵐ(vᵢⱼ)tᵢⱼ`
-- `cᵐᵢⱼ` : generalized link cost for link 𝑖𝑗 , vehicle class 𝑚
+### Generalized link cost function: `cᵏᵢⱼ = fᵏ(vᵢⱼ)tᵢⱼ`
+- `cᵏᵢⱼ` : generalized link cost for link 𝑖𝑗 , vehicle class 𝑚
 - `tᵢⱼ`  : travel time on link 𝑖𝑗
 - `vᵢⱼ`  : travel speed on link 𝑖𝑗
-- `fᵐ(v)`: rate function (\$ per hr) for vehicle class 𝑚, `fᵐ(v) = ∑ₖ ηᵏvᵏ`
+- `fᵏ(v)`: rate function (\$ per hr) for vehicle class k, `fᵏ(v) = ∑ₙ ηⁿvⁿ`
 
 ### Required properties of the generalized cost function
 - Strictly positive
@@ -393,19 +393,20 @@ function traffic_assignment(;network, assignment=:UE, tol=1e-5, maxiters=20, max
                 L = [if k == j i else -1 end for k in N]
 
                 # Iterate
-                t = i
+                t, h = i, j
                 while true
+                    v = t
                     h = t
 
                     f = 0.0
-                    for p in A′[h]
-                        k = findfirst(x -> (x == h), A[p])
+                    for p in A′[v]
+                        k = findfirst(x -> (x == v), A[p])
                         x = xʳₐ[r][p][k]
                         c = cᵢⱼ(p, k, m, x, assignment)
                         if x > ϵ && c > f f, t = c, p end
                     end
-
-                    L[h] = t
+                    
+                    L[v] = t
                     if lₖ[t] == -1      # PAS found
                         e₁ = path(Lᵣ[r], t, j)
                         e₂ = path(L, t, j)
@@ -417,14 +418,14 @@ function traffic_assignment(;network, assignment=:UE, tol=1e-5, maxiters=20, max
                     elseif lₖ[t] == 1   # Cycle found
                         if depth == maxdepth flag = false
                         else
-                            if h == t pₕₜ = Int64[]
+                            if v == t pᵥₜ = Int64[]
                             else
-                                pₕₜ = path(L, h, t)
-                                push!(pₕₜ, h)
-                                δ = fₑ(pₕₜ, xʳₐ[r])
+                                pᵥₜ = path(L, v, t)
+                                push!(pᵥₜ, v)
+                                δ = fₑ(pᵥₜ, xʳₐ[r])
                             end
-                            for (n,i) in enumerate(pₕₜ[1:end-1])
-                                k = findfirst(x -> (x == pₕₜ[n+1]), A[i])::Int64
+                            for (n,i) in enumerate(pᵥₜ[1:end-1])
+                                k = findfirst(x -> (x == pᵥₜ[n+1]), A[i])::Int64
                                 xʳₐ[r][i][k] -= δ
                                 xₐ[i][k] -= δ
                                 for m in M
