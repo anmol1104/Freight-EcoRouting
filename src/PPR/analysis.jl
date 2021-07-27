@@ -1,7 +1,5 @@
 using Plots
-#using StatsPlots
 using JLD
-#using ColorSchemes
 include("ssp.jl")
 plotly()
 Random.seed!(1104)
