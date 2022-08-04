@@ -1,7 +1,7 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5140095.svg)](https://doi.org/10.5281/zenodo.5140095)
 
 # Freight Eco-Routing
-This repo contains pertinent files for the analyses performed in - Can truck eco-routing bridge the gap in transition to zero-emission? Pahwa and Jaller. Under Review (TRE). Pre-print version of this work is availabe at - https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4113893
+This repo contains pertinent files for the analyses performed in Pahwa, A., & Jaller, M. Can Truck Eco-Routing Bridge the Gap in the Transition to Zero-Emission?. Available at SSRN 4113893.
 
 The analyses requires two tools,
 - point-to-point routing tool to evaluate private impacts of eco-routing for the carrier hauling trucks
