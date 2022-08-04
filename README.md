@@ -8,6 +8,29 @@ The analyses requires two tools,
 
 To evaluate private impacts of eco-routing for the carrier hauling trucks
 
+```julia
+ssp(origin, destination[; network], parameter=["TT"], paradigm="expected value", distribution=Weibull(), threshold=1.0, leastcount=1/1000, numsims=100, showpath=false)
+```
+
+For a given paradigm, engine modes to operate in and parameters for the cost function, ssp performs numsims simulations for a vehicle traveling between origin-destination and returns simulated travel statisitcs for travel distance, travel time, fuel consumed, and emissions.
+
+### Arguments
+- `origin::Integer`                                 : origin node
+- `destination::Integer`                            : destination node
+- `network::String`                                 : network
+- `parameter::Array{String}=["TT"]`                 : distance (TD), time (TT), energy (FC), emissions (CH₄, CO, CO₂, N₂O, NOₓ, PM, ROG, SOₓ)
+- `paradigm::String="expected value"`               : determnistic, expected value, variance, reliability
+- `distribution::UnivariateDistribution=Weibull()`  : link speed distribution function
+- `threshold::Float64=1.0`                          : threshold cost for reliability analysis
+- `leastcount::Float64=1/1000`                      : smallest value of discretized cost
+- `numsims::Integer=100`                            : number of simulations
+- `showpath::Bool=false`                            : if true shows every path simulated
+
+### IO Units
+- distance  : miles
+- energy    : litre of fuel
+- emissions : kg
+
 ## multi-class traffic assignment tool 
 
 Developed using paired alternative segements (mTAPAS) to evaluate network-wide effects of system-wide freight eco-routing
@@ -18,9 +41,7 @@ traffic_assignment(;network, assignment=:UE, tol=1e-5, maxiters=20, maxruntime=6
 
 multi-class Traffic Assignment by Paired Alternative Segments (iTAPAS) algorithm
 
-Returns output.csv file with arc flows and arc costs for each vehicle class
-
-Returns report.csv file summarzing iteration-wise total flow, total cost, relative gap and run time
+Returns output.csv file with arc flows and arc costs for each vehicle class and report.csv file summarzing iteration-wise total flow, total cost, relative gap and run time
  
 ### Generalized link cost function: `cᵏᵢⱼ = fᵏ(vᵢⱼ)tᵢⱼ`
 - `cᵏᵢⱼ` : generalized link cost for link 𝑖𝑗 , vehicle class 𝑚
