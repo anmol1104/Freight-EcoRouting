@@ -34,13 +34,13 @@ function main()
 
     ℿ = Float64[]                           # Cost parameters
     ODs = Array{Int64,1}[]                  # Origin-Destination
-    Q = Float64[]                           # OD demand
+    Q = Float64[]                           # OD demandusing
 
     # Coefficients file
     coefFile = joinpath(@__DIR__, "Network\\$network\\coef.csv")
     csv₁ = CSV.File(coefFile)
     df₁ = DataFrame(csv₁)
-    for r in 1:nrow(df₁) append!(ℿ, df₁[r,5]) end
+    for r ∈ 1:nrow(df₁) append!(ℿ, df₁[r,5]) end
 
     # Demand file
     dmndFile = joinpath(@__DIR__, "Network\\$network\\demand.csv")
@@ -48,15 +48,15 @@ function main()
     df₂ = DataFrame(csv₂)
     origins = df₂[!,1]
     destinations = parse.(Int64, String.(names(df₂))[2:end])
-    for r in origins for s in destinations push!(ODs, [r, s]) end end
-    for r in 1:nrow(df₂) for c in 2:ncol(df₂) append!(Q, df₂[r,c]) end end
+    for r ∈ origins for s ∈ destinations push!(ODs, [r, s]) end end
+    for r ∈ 1:nrow(df₂) for c ∈ 2:ncol(df₂) append!(Q, df₂[r,c]) end end
 
     # Geofence file
     geofFile = joinpath(@__DIR__, "Network\\$network\\geofence - SELA.csv")
     csv₃ = CSV.File(geofFile)
     df₃ = DataFrame(csv₃)
     geofence = Dict{Tuple{Int64, Int64}, Int64}()
-    for r in 1:nrow(df₃) geofence[(df₃[r,1], df₃[r,2])] = df₃[r,3] end
+    for r ∈ 1:nrow(df₃) geofence[(df₃[r,1], df₃[r,2])] = df₃[r,3] end
     
     # ODPair [POLA, SB]: [4800, 4322]
     # LCP: RGB 64, 31, 127
@@ -76,8 +76,8 @@ function main()
     - `sim(criteria = "TT")` returns simulated paramters for fastest paths between OD pairs
     """
     function sim(;criteria)
-        X = [Array{Float64,1}[] for _ in 1:length(ODs)]   # Simulated data from ssp
-        for (k, OD) in enumerate(ODs)
+        X = [Array{Float64,1}[] for _ ∈ eachindex(ODs)]   # Simulated data from ssp
+        for (k, OD) ∈ enumerate(ODs)
             r, s = OD
             Z, _, _ = ssp(r, s, network=network, parameter=C₂P[criteria], numsims=1000)
             append!(X[k], Z)
@@ -87,12 +87,13 @@ function main()
 
     function arcs(;criteria)
         X = Dict{Tuple{Int64, Int64}, Array{Any, 1}}()
-        for (k, OD) in enumerate(ODs)
+        for (k, OD) ∈ enumerate(ODs)
             r, s = OD
             _, _, uniquePaths = ssp(r, s, network=network, parameter=C₂P[criteria], numsims=1)
-            for path in uniquePaths
+            for path ∈ uniquePaths
                 i = r
-                for l in 2:length(path)
+                for l ∈ eachindex(path)
+                    if isone(l) continue end
                     j = path[l]
                     if (i,j) ∉ keys(X) X[(i,j)] = [0, 0.0] end
                     X[(i,j)][1] += 1
@@ -102,8 +103,8 @@ function main()
             end
         end
         df = DataFrame(FROM = Int64[], TO = Int64[], GEOFENCE = Int64[], COUNT = Int64[], WTDCOUNT = Float64[])
-        K = [k for k in keys(X)]
-        for (i,j) in K
+        K = [k for k ∈ keys(X)]
+        for (i,j) ∈ K
             push!(df[!, :FROM], i)
             push!(df[!, :TO], j)
             push!(df[!, :GEOFENCE], geofence[(i,j)])
@@ -134,12 +135,12 @@ function main()
         X = load(joinpath(@__DIR__, "Results\\$loc - $criteria.jld"))["X"]
         V = Float64[]
         for parameter ∈ parameters
-            Y = [0.0 for _ in 1:length(ODs)]
-            w = [0.0 for _ in 1:length(ODs)]
-            for (k, _) in enumerate(ODs)
-                Z = [0.0 for _ in 1:1000]
-                for p in C₂P[parameter]
-                    i = findfirst(x -> (x == p), P)
+            Y = [0.0 for _ ∈ eachindex(ODs)]
+            w = [0.0 for _ ∈ eachindex(ODs)]
+            for (k, _) ∈ enumerate(ODs)
+                Z = [0.0 for _ ∈ 1:1000]
+                for p ∈ C₂P[parameter]
+                    i = findfirst(isequal(p), P)
                     Z += X[k][i] #* ℿ[i]
                 end
                 Y[k] = metric(Z)
@@ -174,14 +175,14 @@ function main()
         X₁ = load(joinpath(@__DIR__, "Results\\$loc - $criteria₁.jld"))["X"]
         X₂ = load(joinpath(@__DIR__, "Results\\$loc - $criteria₂.jld"))["X"]
 
-        Δ = [0.0 for _ in ODs]
-        w = [0.0 for _ in ODs]
-        for (k, _) in enumerate(ODs)
+        Δ = [0.0 for _ ∈ ODs]
+        w = [0.0 for _ ∈ ODs]
+        for (k, _) ∈ enumerate(ODs)
             Z₁, Z₂ = X₁[k], X₂[k]
 
-            P₁ = [0.0 for _ in 1:1000]
-            P₂ = [0.0 for _ in 1:1000]
-            for p in C₂P[parameter]
+            P₁ = [0.0 for _ ∈ 1:1000]
+            P₂ = [0.0 for _ ∈ 1:1000]
+            for p ∈ C₂P[parameter]
                 i = findfirst(x -> (x == p), P)
                 P₁ += Z₁[i] * ℿ[i]
                 P₂ += Z₂[i] * ℿ[i]
@@ -219,15 +220,15 @@ function main()
 
     """
     function distributeΔ(parameter; criteria₁, criteria₂, ODpair)
-        k = findfirst(x -> (x == ODpair), ODs)
+        k = findfirst(isequal(ODpair), ODs)
         X₁ = load(joinpath(@__DIR__, "Results\\$loc - $criteria₁.jld"))["X"]
         X₂ = load(joinpath(@__DIR__, "Results\\$loc - $criteria₂.jld"))["X"]
 
         Z₁, Z₂ = X₁[k], X₂[k]
-        P₁ = [0.0 for _ in 1:1000]
-        P₂ = [0.0 for _ in 1:1000]
-        for p in C₂P[parameter]
-            i = findfirst(x -> (x == p), P)
+        P₁ = [0.0 for _ ∈ 1:1000]
+        P₂ = [0.0 for _ ∈ 1:1000]
+        for p ∈ C₂P[parameter]
+            i = findfirst(isequal(p), P)
             P₁ += Z₁[i] * ℿ[i]
             P₂ += Z₂[i] * ℿ[i]
         end
@@ -268,22 +269,22 @@ function main()
         X₂ = load(joinpath(@__DIR__, "Results\\$loc - $criteria₂.jld"))["X"]
 
         Δˣ, Δʸ = Float64[], Float64[]
-        for (k, OD) in enumerate(ODs)
+        for (k, OD) ∈ enumerate(ODs)
             Z₁, Z₂ = X₁[k], X₂[k]
 
-            Pˣ₁ = [0.0 for _ in 1:1000]
-            Pˣ₂ = [0.0 for _ in 1:1000]
-            for p in C₂P[parameter₁]
-                i = findfirst(x -> (x == p), P)
+            Pˣ₁ = [0.0 for _ ∈ 1:1000]
+            Pˣ₂ = [0.0 for _ ∈ 1:1000]
+            for p ∈ C₂P[parameter₁]
+                i = findfirst(isequal(p), P)
                 Pˣ₁ += Z₁[i] * ℿ[i]
                 Pˣ₂ += Z₂[i] * ℿ[i]
             end
             append!(Δˣ, (metric(Pˣ₁)/metric(Pˣ₂)-1)*100)
 
-            Pʸ₁ = [0.0 for _ in 1:1000]
-            Pʸ₂ = [0.0 for _ in 1:1000]
-            for p in C₂P[parameter₂]
-                i = findfirst(x -> (x == p), P)
+            Pʸ₁ = [0.0 for _ ∈ 1:1000]
+            Pʸ₂ = [0.0 for _ ∈ 1:1000]
+            for p ∈ C₂P[parameter₂]
+                i = findfirst(isequal(p), P)
                 Pʸ₁ += Z₁[i] * ℿ[i]
                 Pʸ₂ += Z₂[i] * ℿ[i]
             end
@@ -297,8 +298,8 @@ function main()
         println("   avg₁: $(mean(ε))")
         println("   avg₂: $(mean(Δʸ)/mean(Δˣ))")
 
-        w = [if weighted Q[i] else 1.0 end for i in 1:length(Q)]
-        fig = plot(Δˣ, [Δ*sum(w.*Δʸ.*Δˣ)/sum(w.*Δˣ.*Δˣ) for Δ in Δˣ], linewidth=2,
+        w = [if weighted Q[i] else 1.0 end for i ∈ eachindex(Q)]
+        fig = plot(Δˣ, [Δ*sum(w.*Δʸ.*Δˣ)/sum(w.*Δˣ.*Δˣ) for Δ ∈ Δˣ], linewidth=2,
             color=RGBA(180/255,120/255,70/255), label="")
         fig = scatter!(Δˣ, Δʸ, color=RGBA(70/255,130/255,180/255,50/255),
             markersize=2.5, markerstrokewidth=0.1, label="",
@@ -331,29 +332,29 @@ function main()
         u = 0.25
         pRange = l:(u-l)/100:u
 
-        Y = [[0.0 for _ in ODs] for _ in 0:100]
+        Y = [[0.0 for _ ∈ ODs] for _ ∈ 0:100]
         
-        for (k, OD) in enumerate(ODs)
+        for (k, OD) ∈ enumerate(ODs)
             Z = X[k]
-            V = [0.0 for _ in 1:1000]
-            for p in C₂P[parameter]
-                j = findfirst(x -> (x == p), P)
+            V = [0.0 for _ ∈ 1:1000]
+            for p ∈ C₂P[parameter]
+                j = findfirst(isequal(p), P)
                 V += Z[j] * ℿ[j]
             end
 
-            for (j, p) in enumerate(pRange)
+            for (j, p) ∈ enumerate(pRange)
                 t = mean(V) * (p + 1)
                 Y[j][k] = length(findall(x -> (x ≤ t), V))/length(V)
             end
         end
 
-        w = [if weighted Q[i] else 1.0 end for i in 1:length(Q)]
+        w = [if weighted Q[i] else 1.0 end for i ∈ eachindex(Q)]
         fig = plot(xlab="% deviation from the avg. $(C₂L[parameter])",
             ylab="$parameter reliability")
         fig = plot!(tickfont=(14,"calibri"), guidefont=(16,"calibri"),
             legendfont=(16,"calibri"), legend=(0.75, 0.8))
         
-        fig = plot!(pRange.*100, [mean(y, weights(w)) for y in Y],
+        fig = plot!(pRange.*100, [mean(y, weights(w)) for y ∈ Y],
             label="", linewidth=2.5, ylims=(0,1), yticks=0:0.2:1.0)
         display(fig)
     end
@@ -382,9 +383,9 @@ function main()
         X₂ = load(joinpath(@__DIR__, "Results\\$loc - $cost.jld"))["X"]
 
 
-        eᵢ = findfirst(x -> (x == C₂P[pollutant][1]), P)
+        eᵢ = findfirst(isequal(C₂P[pollutant][1]), P)
         Δᵉ, Δᶜ = Float64[], Float64[]
-        for (k, OD) in enumerate(ODs)
+        for (k, OD) ∈ enumerate(ODs)
             Zᵉ, Zᶜ = X₁[k], X₂[k]
 
             Eᵉ = mean(Zᵉ[eᵢ] * ℿ[eᵢ])
@@ -392,8 +393,8 @@ function main()
 
             Cᵉ = 0.0
             Cᶜ = 0.0
-            for p in C₂P[cost]
-                i = findfirst(x -> (x == p), P)
+            for p ∈ C₂P[cost]
+                i = findfirst(isequal(p), P)
                 Cᵉ += mean(Zᵉ[i] * ℿ[i])
                 Cᶜ += mean(Zᶜ[i] * ℿ[i])
             end
@@ -402,8 +403,8 @@ function main()
             append!(Δᶜ, Cᵉ - Cᶜ)
         end
 
-        w = [if weighted Q[i] else 1.0 end for i in 1:length(ODs)]
-        Z = [Δᶜ[k]/Δᵉ[k] for k in 1:length(ODs)]
+        w = [if weighted Q[i] else 1.0 end for i ∈ eachindex(ODs)]
+        Z = [Δᶜ[k]/Δᵉ[k] for k ∈ eachindex(ODs)]
         println("Cost-Benefit: ", log10(sum(Δᶜ, weights(w))/sum(Δᵉ, weights(w))))
         index = findall(x -> (x ≥ 0), Z)
         Z = Z[index]
@@ -412,7 +413,7 @@ function main()
         Δᵉ= Δᵉ[index]
         println("Cost-Benefit: ", mean(log10.(Z), weights(w)))
         #=
-        fig = plot(Δᵉ, [Δ*sum(w.*Δᶜ.*Δᵉ)/sum(w.*Δᵉ.*Δᵉ) for Δ in Δᵉ], linewidth=2,
+        fig = plot(Δᵉ, [Δ*sum(w.*Δᶜ.*Δᵉ)/sum(w.*Δᵉ.*Δᵉ) for Δ ∈ Δᵉ], linewidth=2,
             color=RGBA(180/255,120/255,70/255), label="Avg. Cost/Benefit")
         fig = scatter!(Δᵉ, Δᶜ, color=RGBA(70/255,130/255,180/255,50/255),
             markersize=2.5, markerstrokewidth=0.1, label="")
@@ -458,40 +459,40 @@ function main()
         Xᵈ = load(joinpath(@__DIR__, "Results\\$loc - TD.jld"))["X"]
         Xᵗ = load(joinpath(@__DIR__, "Results\\$loc - TT.jld"))["X"]
         𝐗 = []
-        for (i, pollutant) in enumerate(pollutants)
+        for (i, pollutant) ∈ enumerate(pollutants)
             push!(𝐗, load(joinpath(@__DIR__, "Results\\$loc - $pollutant.jld"))["X"])
         end
 
         D = Float64[]
         T = Float64[]
-        for (k, OD) in enumerate(ODs)
+        for (k, OD) ∈ enumerate(ODs)
             Zᵈ = Xᵈ[k]
             Zᵗ = Xᵗ[k]
             append!(D, mean(Zᵈ[1]))
             append!(T, mean(Zᵗ[2]))
         end
 
-        Δ = [Float64[] for _ in pollutants]
-        for (i, pollutant) in enumerate(pollutants)
-            j = findfirst(x -> (x == C₂P[pollutant][1]), P)
-            for (k, OD) in enumerate(ODs)
+        Δ = [Float64[] for _ ∈ pollutants]
+        for (i, pollutant) ∈ enumerate(pollutants)
+            j = findfirst(isequal(C₂P[pollutant][1]), P)
+            for (k, OD) ∈ enumerate(ODs)
                 Zₒ, Zᵢ = Xₒ[k], 𝐗[i][k]
                 append!(Δ[i], (mean(Zᵢ[j])/mean(Zₒ[j])-1)*100)
             end
         end
 
         fig = plot()
-        for (i, pollutant) in enumerate(pollutants)
+        for (i, pollutant) ∈ enumerate(pollutants)
             X = 0:1:Int(ceil(maximum(D)))
-            Y = [mean(Δ[i][findall(x -> (X[j-1] < x ≤ X[j]), D)]) for j in 2:length(X)]
+            Y = [mean(Δ[i][findall(x -> (X[j-1] < x ≤ X[j]), D)]) for j ∈ 2:length(X)]
             fig = plot!(X[2:end], Y, label=pollutant)
         end
         display(fig)
 
         fig = plot()
-        for (i, pollutant) in enumerate(pollutants)
+        for (i, pollutant) ∈ enumerate(pollutants)
             X = 0:1/60:Int(ceil(maximum(T)))
-            Y = [mean(Δ[i][findall(x -> (X[j-1] < x ≤ X[j]), T)]) for j in 2:length(X)]
+            Y = [mean(Δ[i][findall(x -> (X[j-1] < x ≤ X[j]), T)]) for j ∈ 2:length(X)]
             fig = plot!(X[2:end], Y, label=pollutant)
         end
         display(fig)
