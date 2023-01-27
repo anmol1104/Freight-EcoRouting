@@ -1,5 +1,6 @@
 using Plots
 using JLD
+using CSV
 include("ssp.jl")
 plotly()
 Random.seed!(1104)
@@ -21,7 +22,8 @@ function main()
     C₂P = Dict{String, Array{String,1}}("TD" => ["TD"], "TT" => ["TT"], "FC" => ["FC"],
         "CH₄" => ["CH4"], "CO"  => ["CO"], "CO₂" => ["CO2"], "N₂O" => ["N2O"],
         "NOₓ" => ["NOx"], "PM"  => ["PM"], "ROG" => ["ROG"], "SOₓ" => ["SOx"] ,
-        "TC" => ["TD", "TT", "FC"], "GHG" => ["CH4", "CO2", "N2O", "ROG"], "CP" => ["CO", "NOx", "PM", "SOx"])  # Criteria to parameters
+        "TC" => ["TD", "TT", "FC"], "GHG" => ["CH4", "CO2", "N2O", "ROG"], "CP" => ["CO", "NOx", "PM", "SOx"],
+        "E" => ["CH4", "CO", "CO2", "NOx", "PM", "ROG"])  # Criteria to parameters
     
     C₂L = Dict{String, String}("TD" => "Travel Distance (TD)", "TT" => "Travel Time (TT)",
             "FC" => "Fuel Consumption (FC)", "CH₄" => "Methane emissions (CH₄)",
@@ -49,6 +51,17 @@ function main()
     for r in origins for s in destinations push!(ODs, [r, s]) end end
     for r in 1:nrow(df₂) for c in 2:ncol(df₂) append!(Q, df₂[r,c]) end end
 
+    # Geofence file
+    geofFile = joinpath(@__DIR__, "Network\\$network\\geofence - SELA.csv")
+    csv₃ = CSV.File(geofFile)
+    df₃ = DataFrame(csv₃)
+    geofence = Dict{Tuple{Int64, Int64}, Int64}()
+    for r in 1:nrow(df₃) geofence[(df₃[r,1], df₃[r,2])] = df₃[r,3] end
+    
+    # ODPair [POLA, SB]: [4800, 4322]
+    # LCP: RGB 64, 31, 127
+    # FP : RGB 127, 64, 31
+    # SP : RGB 127, 31, 94
 
     # Simulator ────────────────────────────────────────────────────────────────────────────────
     """
@@ -72,6 +85,33 @@ function main()
         save(joinpath(@__DIR__, "Results\\$loc - $criteria.jld"), "X", X)
     end
 
+    function arcs(;criteria)
+        X = Dict{Tuple{Int64, Int64}, Array{Any, 1}}()
+        for (k, OD) in enumerate(ODs)
+            r, s = OD
+            _, _, uniquePaths = ssp(r, s, network=network, parameter=C₂P[criteria], numsims=1)
+            for path in uniquePaths
+                i = r
+                for l in 2:length(path)
+                    j = path[l]
+                    if (i,j) ∉ keys(X) X[(i,j)] = [0, 0.0] end
+                    X[(i,j)][1] += 1
+                    X[(i,j)][2] += Q[k]
+                    i = j
+                end
+            end
+        end
+        df = DataFrame(FROM = Int64[], TO = Int64[], GEOFENCE = Int64[], COUNT = Int64[], WTDCOUNT = Float64[])
+        K = [k for k in keys(X)]
+        for (i,j) in K
+            push!(df[!, :FROM], i)
+            push!(df[!, :TO], j)
+            push!(df[!, :GEOFENCE], geofence[(i,j)])
+            push!(df[!, :COUNT], X[(i,j)][1])
+            push!(df[!, :WTDCOUNT], X[(i,j)][2])
+        end
+        CSV.write(joinpath(@__DIR__, "Results\\$loc - $criteria - arcs.csv"), df)
+    end
 
 
     # Measure ────────────────────────────────────────────────────────────────────────────────
@@ -92,6 +132,7 @@ function main()
     """
     function measure(parameters; criteria, metric, weighted=false)
         X = load(joinpath(@__DIR__, "Results\\$loc - $criteria.jld"))["X"]
+        V = Float64[]
         for parameter ∈ parameters
             Y = [0.0 for _ in 1:length(ODs)]
             w = [0.0 for _ in 1:length(ODs)]
@@ -99,13 +140,15 @@ function main()
                 Z = [0.0 for _ in 1:1000]
                 for p in C₂P[parameter]
                     i = findfirst(x -> (x == p), P)
-                    Z += X[k][i] * ℿ[i]
+                    Z += X[k][i] #* ℿ[i]
                 end
                 Y[k] = metric(Z)
                 w[k] = weighted ? Q[k] : 1.0
             end
-            println("$metric($parameter) on least $criteria path: ", (mean(Y, weights(w))))
+            println("$metric($parameter) on least $criteria path: ", (sum(Y, weights(w))))
+            push!(V, mean(Y, weights(w)))
         end
+        return V
     end
 
 
@@ -127,10 +170,10 @@ function main()
     - `Δ("CO₂", criteria₁="TD", crieteria₂="TT", metric=mean)` returns % change in mean carbon dioxide emissions on 
       the shortest and fastest path between all OD pairs.
     """
-    function Δ(parameter; criteria₁, criteria₂, metric, weighted=false)
+    function Δ(parameter; criteria₁, criteria₂, metric, weighted=false, remove_zeros=false)
         X₁ = load(joinpath(@__DIR__, "Results\\$loc - $criteria₁.jld"))["X"]
         X₂ = load(joinpath(@__DIR__, "Results\\$loc - $criteria₂.jld"))["X"]
-        
+
         Δ = [0.0 for _ in ODs]
         w = [0.0 for _ in ODs]
         for (k, _) in enumerate(ODs)
@@ -148,7 +191,14 @@ function main()
             Δ[k] = δ
             w[k] = weighted ? Q[k] : 1.0
         end
+        if remove_zeros
+            index = findall(x -> x != 0, Δ)
+            println("Re-routed trips: $(length(index)/length(Δ))")
+            Δ = Δ[index]
+            w = w[index] 
+        end
         println("% change in $metric($parameter): ", mean(Δ, weights(w)))
+        return mean(Δ, weights(w))
     end
 
     """
@@ -192,10 +242,6 @@ function main()
         fig = vline!([mean(P₁)], color=RGBA(31/255,127/255,64/255), linewidth=2, label="")
         fig = vline!([mean(P₂)], color=RGBA(127/255,31/255,94/255), linewidth=2, label="")
         display(fig)
-
-        # LCP: RGB 64, 31, 127
-        # FP : RGB 127, 64, 31
-        # SP : RGB 127, 31, 94
     end
 
     """
@@ -275,10 +321,10 @@ function main()
     - `weighted::Bool=false`    : if true, returns results weighted by demand between OD pairs
 
     # Example
-    - `crossreliability(criterion="TT", parameter="CO₂", reliability="parameter")` returns CO₂ reliability on the 
+    - `crossreliability(criterion="TT", parameter="CO₂")` returns CO₂ reliability on the 
       simulated fastest paths between the  OD pairs.
     """
-    function crossreliability(; criteria, parameter, reliability="parameter", weighted=false)
+    function crossreliability(; criteria, parameter, weighted=false)
         X = load(joinpath(@__DIR__, "Results\\$loc - $criteria.jld"))["X"]
 
         l = -0.25
@@ -358,13 +404,14 @@ function main()
 
         w = [if weighted Q[i] else 1.0 end for i in 1:length(ODs)]
         Z = [Δᶜ[k]/Δᵉ[k] for k in 1:length(ODs)]
+        println("Cost-Benefit: ", log10(sum(Δᶜ, weights(w))/sum(Δᵉ, weights(w))))
         index = findall(x -> (x ≥ 0), Z)
         Z = Z[index]
         w = w[index]
         Δᶜ= Δᶜ[index]
         Δᵉ= Δᵉ[index]
         println("Cost-Benefit: ", mean(log10.(Z), weights(w)))
-
+        #=
         fig = plot(Δᵉ, [Δ*sum(w.*Δᶜ.*Δᵉ)/sum(w.*Δᵉ.*Δᵉ) for Δ in Δᵉ], linewidth=2,
             color=RGBA(180/255,120/255,70/255), label="Avg. Cost/Benefit")
         fig = scatter!(Δᵉ, Δᶜ, color=RGBA(70/255,130/255,180/255,50/255),
@@ -383,6 +430,7 @@ function main()
             tickfont="calibri", guidefont="calibri", legendfont="calibri",
             legend=(0.75, 0.75))
         display(fig)
+        =#
     end
 
 
@@ -450,7 +498,8 @@ function main()
     end
     # ────────────────────────────────────────────────────────────────────────────────
     
-    
+    measure(["TD", "TT", "FC", "CH₄", "CO", "CO₂", "NOₓ", "PM", "ROG"], criteria="ROG", metric=mean, weighted=true)
+    #costbenefit("TC", "CH₄"; weighted=true)
     return
 end
 main()
