@@ -10,6 +10,7 @@ using Printf
 """
     ssp(origin, destination[; network], parameter=["TT"], paradigm="expected value", distribution=Weibull(), threshold=1.0, leastcount=1/1000, numsims=100, showpath=false)
 
+Stochastic Shortest Path
 For a given paradigm, engine modes to operate in and parameters for the cost function, ssp performs numsims simulations for a vehicle traveling between origin-destination
 and returns simulated travel statisitcs for travel distance, travel time, fuel consumed and emissions.
 
@@ -49,7 +50,7 @@ function ssp(origin, destination; network, parameter=["TT"],
     μ = Array{Float64,1}[]                  # Average link cost
     σ² = Array{Float64,1}[]                 # Var/iance in link cost
     pr = Array{Array{Float64,1},1}[]        # Link cost probabilities
-    kₗ = Array{Int64,1}[]                    # Lower-bounds for pr → 0
+    kₗ = Array{Int64,1}[]                   # Lower-bounds for pr → 0
     kᵤ = Array{Int64,1}[]                   # Upper-bounds for pr → 0
     prune = Int64[]                         # Pruned nodes
     parameters = String[]                   # Parameters
@@ -68,13 +69,13 @@ function ssp(origin, destination; network, parameter=["TT"],
         coefFile = joinpath(dir, "coef.csv")
         csv₁ = CSV.File(coefFile)
         df₁ = DataFrame(csv₁)
-        for r in 1:nrow(df₁)
+        for r ∈ 1:nrow(df₁)
             p = df₁[r,1]::String
             push!(parameters, p)
-            for c in 2:4
+            for c ∈ 2:4
                 append!(ℿ, df₁[r,5])
                 append!(η, df₁[r,c])
-                if p in parameter append!(θ, 1.0) else append!(θ, 0.0) end
+                if p ∈ parameter append!(θ, 1.0) else append!(θ, 0.0) end
             end
         end
 
@@ -90,7 +91,7 @@ function ssp(origin, destination; network, parameter=["TT"],
         distScale = df₂[!,6]::Array{Float64,1}
         dist = typeof(distribution)
         n = max(maximum(head), maximum(tail))
-        for i in 1:n
+        for i ∈ 1:n
             append!(N, i)
             push!(A, [])
             push!(M, [])
@@ -104,7 +105,7 @@ function ssp(origin, destination; network, parameter=["TT"],
             push!(kᵤ, [])
         end
 
-        for i in 1:length(head)
+        for i ∈ eachindex(head)
             append!(A[head[i]], tail[i])
             append!(M[head[i]], linkClass[i])
             append!(d[head[i]], linkLength[i])
@@ -113,45 +114,46 @@ function ssp(origin, destination; network, parameter=["TT"],
         end
 
         # Geofence file
-        append!(γ, [[0 for j in A[i]] for i in N])
-        if "geofence.csv" in readdir(dir)
+        append!(γ, [[0 for j ∈ A[i]] for i ∈ N])
+        if "geofence.csv" ∈ readdir(dir)
             geofFile = joinpath(dir, "geofence.csv")
             csv₃ = CSV.File(geofFile)
             df₃ = DataFrame(csv₃)
-            for r in 1:nrow(df₃)
+            for r ∈ 1:nrow(df₃)
                 i = df₃[r,1]::Int64
                 j = df₃[r,2]::Int64
-                k = findfirst(x -> (x == j), A[i])
+                k = findfirst(isequal(j), A[i])
                 γ[i][k] =  df₃[r,3]
             end
         end
 
         # Generating cost metrics - mean, variance and proability distribution
-        X(v) = [v^y for x in 1:length(parameters) for y in 0:2]
+        X(v) = [v^y for x ∈ eachindex(parameters) for y ∈ 0:2]
         L = Int(round(C̅/δ))
-        Zₘ = Array{Float64,1}[[] for class in sort(unique(linkClass))]
+        Zₘ = Array{Float64,1}[[] for class ∈ sort(unique(linkClass))]
         # Generating random instances of link cost for a 1 mile long link of each link class
-        for (m, class) in enumerate(sort(unique(linkClass)))
-            k = findfirst(x -> (x == class), linkClass)::Int64
-            i, j = head[k], tail[k]
-            k = findfirst(x -> (x == j), A[i])::Int64
+        for (m, class) ∈ enumerate(sort(unique(linkClass)))
+            k = findfirst(isequal(class), linkClass)::Int64
+            i = head[k]
+            j = tail[k]
+            k = findfirst(isequal(j), A[i])::Int64
             Random.seed!(i * k)
             V = rand(dist(α[i][k], β[i][k]), 1500)::Array{Float64,1}
-            Z = [sum(η .* X(v) .* 1/v .* ℿ .* θ) for v in V]
+            Z = [sum(η .* X(v) .* 1/v .* ℿ .* θ) for v ∈ V]
             Zₘ[m] = Z
         end
         # Using the random instances to generate link cost metrics for each link
-        Threads.@threads for i in N
-             for (k,j) in enumerate(A[i])
+        Threads.@threads for i ∈ N
+             for (k,j) ∈ enumerate(A[i])
                  m = M[i][k]
                  C = Zₘ[m] .* d[i][k] .* (1 + γ[i][k]*1e6)
                  append!(μ[i], mean(C))
                  append!(σ²[i], var(C))
-                 if paradigm == "reliability" 
+                 if isequal(paradigm, "reliability")
                     # Generating probability distribution
                      Lᶜ = Int(round(maximum(C) / δ))
                      h = fit(Histogram, C, (0.5:1:(max(L, Lᶜ) + 0.5)) * δ).weights
-                     if sum(h) == 0 push!(pr[i], h)
+                     if iszero(sum(h)) push!(pr[i], h)
                      else push!(pr[i], h / sum(h)) end
                      maxm, argmaxm = findmax(pr[i][k])
                      # Approximating pr → 0
@@ -171,12 +173,12 @@ function ssp(origin, destination; network, parameter=["TT"],
     # Djikstra's label setting algorithm
     # Returns predecessor and cost labels L,C for every node i for least cost path from/to node r given arc costs cₐ
     function djk(cₐ, r, type)
-        𝐴 = Array{Int64,1}[[] for i in N]
-        𝑐ₐ= Array{Float64,1}[[] for i in N]
+        𝐴 = Array{Int64,1}[[] for i ∈ N]
+        𝑐ₐ= Array{Float64,1}[[] for i ∈ N]
 
-        for i in N
-            for (k,j) in enumerate(A[i])
-                if type == "source"
+        for i ∈ N
+            for (k,j) ∈ enumerate(A[i])
+                if isequal(type, "source")
                     push!(𝐴[i], A[i][k])
                     push!(𝑐ₐ[i], cₐ[i][k])
                 else
@@ -186,18 +188,18 @@ function ssp(origin, destination; network, parameter=["TT"],
             end
         end
  
-        L = [if i == r r else -1 end for i in N]       # Predecessor label
-        C = [if i == r 0.0 else Inf end for i in N]    # Cost label
-        X = copy(N)                                    # Set of open nodes
+        L = [if isequal(i, r) r else -1 end for i ∈ N]      # Predecessor label
+        C = [if isequal(i, r) 0. else Inf end for i ∈ N]    # Cost label
+        X = copy(N)                                         # Set of open nodes
 
         i = r
         deleteat!(X, i)
         while !isempty(X)
-            for (k,j) in enumerate(𝐴[i])
+            for (k,j) ∈ enumerate(𝐴[i])
                 c = C[i] + 𝑐ₐ[i][k]
-                if c < C[j]  && j in X L[j], C[j] = i, c end
+                if c < C[j]  && j ∈ X L[j], C[j] = i, c end
             end
-            index = argmin([C[j] for j in X])
+            index = argmin([C[j] for j ∈ X])
             i = X[index]
             deleteat!(X, index)
         end
@@ -208,8 +210,8 @@ function ssp(origin, destination; network, parameter=["TT"],
     # Returns Djikstra's shortest path from/to node r to/from node s using label L
     function djkpath(L, r, s)
         source, sink = false, false
-        if L[r] == r source = true end
-        if L[s] == s sink = true end
+        if isequal(L[r], r) source = true end
+        if isequal(L[s], s) sink = true end
 
         if sink r, s = s, r end
 
@@ -228,13 +230,13 @@ function ssp(origin, destination; network, parameter=["TT"],
     # Returns reliability and successor node index matrix (Policy tables)
     function f()
         L = Int(round(C̅/δ))
-        N′ = filter(x -> !(x in prune), N)
+        N′ = filter(x -> !(x ∈ prune), N)
         filter!(x -> (x ≠ s), N′)
-        ρ = [[if i==s 1.0 else 0.0 end for _ in 0:L] for i in N]    # Reliability
-        λ = [[if i==s s else -1 end for _ in 0:L] for i in N]       # Index of next node in 𝒜[i]
-        for l in 1:L
-            Threads.@threads for i in N′
-                ρ[i][l + 1], λ[i][l + 1] = findmax([sum([pr[i][k][kₒ] * ρ[j][l - kₒ + 1] for kₒ in min(l, kₗ[i][k]):min(l, kᵤ[i][k])]) for (k,j) in enumerate(A[i])])
+        ρ = [[if isequal(i, s) 1.0 else 0.0 end for _ ∈ 0:L] for i ∈ N]    # Reliability
+        λ = [[if isequal(i, s) s else -1 end for _ ∈ 0:L] for i ∈ N]       # Index of next node ∈ A[i]
+        for l ∈ 1:L
+            Threads.@threads for i ∈ N′
+                ρ[i][l + 1], λ[i][l + 1] = findmax([sum([pr[i][k][kₒ] * ρ[j][l - kₒ + 1] for kₒ ∈ min(l, kₗ[i][k]):min(l, kᵤ[i][k])]) for (k,j) ∈ enumerate(A[i])])
             end
         end
         return ρ, λ
@@ -244,12 +246,13 @@ function ssp(origin, destination; network, parameter=["TT"],
     # Returns reliability of a given path (p)
     function reliability(p)
         L = Int(round(C̅/δ))
-        ρ = [[if i==s 1.0 else 0.0 end for _ in 0:L] for i in N]    # Reliability
-        for l in 1:L
-            for m in length(p):-1:2
+        ρ = [[if isequal(i, s) 1.0 else 0.0 end for _ ∈ 0:L] for i ∈ N]    # Reliability
+        for l ∈ 1:L
+            for m ∈ reverse(eachindex(p))
+                if isone(m) continue end
                 i, j = p[m-1], p[m]
-                k = findfirst(x -> (x == j), A[i])::Int64
-                ρ[i][l+1] = sum([pr[i][k][kₒ] * ρ[j][l - kₒ + 1] for kₒ in min(l, kₗ[i][k]):min(l,kᵤ[i][k])])
+                k = findfirst(isequal(j), A[i])::Int64
+                ρ[i][l+1] = sum([pr[i][k][kₒ] * ρ[j][l - kₒ + 1] for kₒ ∈ min(l, kₗ[i][k]):min(l,kᵤ[i][k])])
             end
         end
         return ρ
@@ -260,85 +263,88 @@ function ssp(origin, destination; network, parameter=["TT"],
     function mcs()
         println("\nSimulating...")
         dist = typeof(distribution)
-        L = Int(round(C̅/δ))
-        X(v) = [v^y for x in 1:length(parameters) for y in 0:2]
+        L    = Int(round(C̅/δ))
+        X(v) = [v^y for x ∈ eachindex(parameters) for y ∈ 0:2]
 
-        paths = Array{Int64,1}[[] for _ in 1:numsims]
-        Z = [[0.0 for _ in 1:numsims] for _ in parameters]
-        C = [0.0 for _ in 1:numsims]
+        paths = Array{Int64,1}[[] for _ ∈ 1:numsims]
+        Z     = [[0.0 for _ ∈ 1:numsims] for _ ∈ eachindex(parameters)]
+        C     = [0.0 for _ ∈ 1:numsims]
 
-        if paradigm == "deterministic"
-            for n in 1:numsims
-                Zₗ = [[[-1.0 for _ in 1:length(A[i])] for i in N] for _ in 1:length(parameters)]
-                Cₗ = [[-1.0 for _ in 1:length(A[i])] for i in N]
-                for i in N
-                    for (k,j) in enumerate(A[i])
+        if isequal(paradigm, "deterministic")
+            for n ∈ 1:numsims
+                Zₗ = [[[-1.0 for _ ∈ eachindex(A[i])] for i ∈ N] for _ ∈ eachindex(parameters)]
+                Cₗ = [[-1.0 for _ ∈ eachindex(A[i])] for i ∈ N]
+                for i ∈ N
+                    for (k,j) ∈ enumerate(A[i])
                         Random.seed!(i * n)
                         v = rand(dist(α[i][k], β[i][k]))
                         z = η .* X(v) .* (d[i][k]/v)
-                        for x in 1:length(parameters) Zₗ[x][i][k] = sum(z[(3x-2):3x]) end
+                        for x ∈ eachindex(parameters) Zₗ[x][i][k] = sum(z[(3x-2):3x]) end
                         Cₗ[i][k] = sum(z .* ℿ .* θ)
                     end
                 end
                 Lᵣ, _ = djk(Cₗ, r, "source")
                 p = djkpath(Lᵣ, r, s)
-                for m in 2:length(p)
+                for m ∈ eachindex(p)
+                    if isone(m) continue end
                     i, j = p[m-1], p[m]
-                    k = findfirst(x -> (x == j), A[i])::Int64
-                    for x in 1:length(parameters) Z[x][n] += Zₗ[x][i][j] end
+                    k = findfirst(isequal(j), A[i])::Int64
+                    for x ∈ 1:length(parameters) Z[x][n] += Zₗ[x][i][j] end
                     C[n] += Cₗ[i][k]
                 end
                 paths[n] = p
             end
 
-        elseif paradigm == "expected value"
+        elseif isequal(paradigm, "expected value")
             println("Algorithm run time")
             @time Lᵣ, _ = djk(μ, r, "source")
             @time p = djkpath(Lᵣ, r, s)
             #ρ = reliability(p)
-            for n in 1:numsims
-                for m in 2:length(p)
+            for n ∈ 1:numsims
+                for m ∈ eachindex(p)
+                    if isone(m) continue end
                     i, j = p[m-1],  p[m]
-                    k = findfirst(x -> (x == j), A[i])::Int64
+                    k = findfirst(isequal(j), A[i])::Int64
                     Random.seed!(i * n)
                     v = rand(dist(α[i][k], β[i][k]))
                     z = η .* X(v) .* (d[i][k]/v)
-                    for x in 1:length(parameters) Z[x][n] += sum(z[(3x-2):3x]) end
+                    for x ∈ eachindex(parameters) Z[x][n] += sum(z[(3x-2):3x]) end
                     C[n] += sum(z .* ℿ .* θ)
                 end
                 paths[n] = p
             end
 
-        elseif paradigm == "variance"
+        elseif isequal(paradigm, "variance")
             println("Algorithm run time")
             @time Lᵣ, _ = djk(σ², r, "source")
             @time p = djkpath(Lᵣ, r, s)
             #ρ = reliability(p)
-            for n in 1:numsims
-                for m in 2:length(p)
+            for n ∈ 1:numsims
+                for m ∈ eachindex(p)
+                    if isone(m) continue end
                     i, j = p[m-1], p[m]
-                    k = findfirst(x -> (x == j), A[i])::Int64
+                    k = findfirst(isequal(j), A[i])::Int64
                     Random.seed!(i * n)
                     v = rand(dist(α[i][k], β[i][k]))
                     z = η .* X(v) .* (d[i][k]/v)
-                    for x in 1:length(parameters) Z[x][n] += sum(z[(3x-2):3x]) end
+                    for x ∈ eachindex(parameters) Z[x][n] += sum(z[(3x-2):3x]) end
                     C[n] += sum(z .* ℿ .* θ)
                 end
                 paths[n] = p
             end
 
-        elseif paradigm == "reliability"
+        elseif isequal(paradigm, "reliability")
             println("Pre-processing...")
             # Pruning
-            cₘᵢₙ = [[kₗ[i][k] * δ for k in 1:length(A[i])] for i in N]
+            cₘᵢₙ = [[kₗ[i][k] * δ for k ∈ eachindex(A[i])] for i ∈ N]
             _, Cᵣ = djk(cₘᵢₙ, r, "source")
             _, Cₛ = djk(cₘᵢₙ, s, "sink")
-            for i in N if Cᵣ[i] + Cₛ[i] > C̅ append!(prune, i) end end
+            for i ∈ N if Cᵣ[i] + Cₛ[i] > C̅ append!(prune, i) end end
 
             # Tie breaker
             _, Cₒ = djk(μ, s, "sink")
-            for i in N
-                z = [if (A[i][k] in prune) Inf else μ[i][k] + Cₒ[j] end for (k,j) in enumerate(A[i])]
+            for i ∈ N
+                z = [if (A[i][k] ∈ prune) Inf else μ[i][k] + Cₒ[j] end for (k,j) ∈ enumerate(A[i])]
                 k = sortperm(z)
                 A[i] = A[i][k]
                 d[i] = d[i][k]
@@ -355,7 +361,7 @@ function ssp(origin, destination; network, parameter=["TT"],
             println("Algorithm run time")
             @time Lₛ, _ = djk(μ, s, "sink")
             @time ρ, λ = f()
-            for n in 1:numsims
+            for n ∈ 1:numsims
                 i = r
                 append!(paths[n], i)
                 while i ≠ s
@@ -365,20 +371,21 @@ function ssp(origin, destination; network, parameter=["TT"],
                         Random.seed!(i * n)
                         v = rand(dist(α[i][k], β[i][k]))
                         z = η .* X(v) .* (d[i][k]/v)
-                        for x in 1:length(parameters) Z[x][n] += sum(z[(3x-2):3x]) end
+                        for x ∈ eachindex(parameters) Z[x][n] += sum(z[(3x-2):3x]) end
                         C[n] += sum(z .* ℿ .* θ)
                         i = A[i][k]
                         append!(paths[n], i)
                     else
                         p = djkpath(Lₛ, i, s)             # Remaining route is completed as Least Expected Path
                         append!(paths[n], p[2:end])
-                        for m in 2:length(p)
+                        for m ∈ eachindex(p)
+                            if isone(m) continue end
                             i, j = p[m-1], p[m]
-                            k = findfirst(x -> (x == j), A[i])::Int64
+                            k = findfirst(isequal(j), A[i])::Int64
                             Random.seed!(i * n)
                             v = rand(dist(α[i][k], β[i][k]))
                             z = η .* X(v) .* (d[i][k]/v)
-                            for x in 1:length(parameters) Z[x][n] += sum(z[(3x-2):3x]) end
+                            for x ∈ eachindex(parameters) Z[x][n] += sum(z[(3x-2):3x]) end
                             C[n] += sum(z .* ℿ .* θ)
                         end
                         i = s
@@ -391,9 +398,9 @@ function ssp(origin, destination; network, parameter=["TT"],
         "CH4" => "CH₄", "CO"  => "CO", "CO2" => "CO₂" , "N2O" => "N₂O", "NOx" => "NOₓ", 
         "PM"  => "PM", "ROG" => "ROG", "SOx" => "SOₓ")
         uniquePaths = unique(paths)
-        pathCount = [length(findall(x -> (x == path), paths)) for path in uniquePaths]
+        pathCount = [length(findall(isequal(path), paths)) for path ∈ uniquePaths]
         df = DataFrame(stat = ["mean", "var", "median", "min", "max"])
-        for i in 1:length(parameters)
+        for i ∈ eachindex(parameters)
             df[!,Symbol(parameterize[parameters[i]])] = [@sprintf("%.2E",mean(Z[i])), @sprintf("%.2E", var(Z[i])),
             @sprintf("%.2E", median(Z[i])), @sprintf("%.2E", minimum(Z[i])), @sprintf("%.2E", maximum(Z[i]))]
         end
@@ -401,11 +408,11 @@ function ssp(origin, destination; network, parameter=["TT"],
         println("\nTravel Statistics:")
         println(df)
 
-        #if paradigm in ("expected value", "variance", "reliability") println("\nactual reliability: $(round(ρ[r][L + 1], digits=5))") else println("\nactual reliability: ", "NA") end
+        #if paradigm ∈ ("expected value", "variance", "reliability") println("\nactual reliability: $(round(ρ[r][L + 1], digits=5))") else println("\nactual reliability: ", "NA") end
         println("calculated reliability: $(round(length(findall(x -> (x ≤ C̅), C))/numsims, digits=5))")
         if showpath
             println("\nPaths:")
-            for path in uniquePaths println("   Path => $path") end
+            for path ∈ uniquePaths println("   Path => $path") end
             println("Path count: $pathCount")
         end
         println("\nSimulation fin.")
