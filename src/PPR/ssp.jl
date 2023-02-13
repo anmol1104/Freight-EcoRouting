@@ -8,7 +8,7 @@ using Printf
 
 
 """
-    ssp(origin, destination[; network], parameter=["TT"], paradigm="expected value", distribution=Weibull(), threshold=1.0, leastcount=1/1000, numsims=100, showpath=false)
+    ssp(origin, destination; network, parameter=["TT"], paradigm="expected value", distribution=Weibull(), threshold=1.0, leastcount=1/1000, numsims=100, showpath=false)
 
 Stochastic Shortest Path
 For a given paradigm, engine modes to operate in and parameters for the cost function, ssp performs numsims simulations for a vehicle traveling between origin-destination
