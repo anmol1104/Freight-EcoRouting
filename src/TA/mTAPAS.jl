@@ -25,14 +25,14 @@ Returns report.csv file summarzing iteration-wise total flow, total cost, relati
 - Continuously differentiable
 
 ### Arguments
-- `network::String`             : network (availabe at: https://github.com/anmol1104/Freight-EcoRouting/src/TA/network)
+- `network::String`             : network (availabe at: https://github.com/anmol1104/Freight-EcoRouting/tree/master/src/TA/Network)
 - `assignment::Symbol=:UE`      : User Equilibrium (UE) or System Optimal (SO) assigment
 - `tol::Float=1e-5`             : tolerance level for relative gap convergence
 - `maxiters::Integer=20`        : maximum number of iterations
 - `maxruntime::Integer=600`     : maximum wall clock run time (s)
 - `log::Symbol=:on`             : shows results for every iteration if log is on
 
-### DataFiles (available at: https://github.com/anmol1104/Freight-EcoRouting/src/TA/network)
+### DataFiles (available at: https://github.com/anmol1104/Freight-EcoRouting/tree/master/src/TA/Network)
 - class   : Enlists coefficients of `fᵐ(v)` for each class
 - network : Details the topology of the network
 - demand  : Enlists OD pairs and corresponding demand for each class in passenger car equivalent (PCE)
