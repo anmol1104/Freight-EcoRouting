@@ -26,6 +26,11 @@ For a given paradigm, engine modes to operate in and parameters for the cost fun
 - `numsims::Integer=100`                            : number of simulations
 - `showpath::Bool=false`                            : if true shows every path simulated
 
+### DataFiles (available at: https://github.com/anmol1104/Freight-EcoRouting/tree/master/src/PPR/Network)
+- coef    : Enlists parameter coefficients
+- network : Details the topology of the network
+- goefence: Enlists arcs in the geofence (optional)
+
 ### IO Units
 - distance  : miles
 - energy    : litre of fuel

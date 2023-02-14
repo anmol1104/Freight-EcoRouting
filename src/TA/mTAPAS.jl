@@ -36,6 +36,7 @@ Returns report.csv file summarzing iteration-wise total flow, total cost, relati
 - class   : Enlists coefficients of `fᵐ(v)` for each class
 - network : Details the topology of the network
 - demand  : Enlists OD pairs and corresponding demand for each class in passenger car equivalent (PCE)
+- goefence: Enlists arcs in the geofence (optional)
 
 ### IO Units
 - length  : miles

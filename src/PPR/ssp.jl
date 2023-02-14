@@ -26,6 +26,11 @@ and returns simulated travel statisitcs for travel distance, travel time, fuel c
 - `numsims::Integer=100`                            : number of simulations
 - `showpath::Bool=false`                            : if true shows every path simulated
 
+### DataFiles (available at: https://github.com/anmol1104/Freight-EcoRouting/tree/master/src/PPR/Network)
+- coef    : Enlists parameter coefficients
+- network : Details the topology of the network
+- goefence: Enlists arcs in the geofence (optional)
+
 ### IO Units
 - distance  : miles
 - energy    : litre of fuel
@@ -62,7 +67,7 @@ function ssp(origin, destination; network, parameter=["TT"],
     function popall!(arr) while !isempty(arr) pop!(arr) end end
 
     # Network build
-    # Fetches netowrk files and builds network related vectors
+    # Fetches network files and builds network related vectors
     function build()
         println("\nBuilding network...")
         # Coefficient file
