@@ -26,7 +26,7 @@ For a given paradigm, engine modes to operate in and parameters for the cost fun
 - `numsims::Integer=100`                            : number of simulations
 - `showpath::Bool=false`                            : if true shows every path simulated
 
-### DataFiles (available at: https://github.com/anmol1104/Freight-EcoRouting/tree/master/src/PPR/Network)
+### DataFiles (available at: src/PPR/Network)
 - coef    : Enlists parameter coefficients
 - network : Details the topology of the network
 - goefence: Enlists arcs in the geofence (optional)
@@ -67,7 +67,7 @@ Returns output.csv file with arc flows and arc costs for each vehicle class and 
 - `maxruntime::Integer=600`     : maximum wall clock run time (s)
 - `log::Symbol=:on`             : shows results for every iteration if log is on
 
-### DataFiles (available at: https://github.com/anmol1104/Freight-EcoRouting/tree/master/src/TA/Network)
+### DataFiles (available at: src/TA/Network)
 - class   : Enlists coefficients of `fᵐ(v)` for each class
 - network : Details the topology of the network
 - demand  : Enlists OD pairs and corresponding demand for each class in passenger car equivalent (PCE)
