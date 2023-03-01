@@ -60,7 +60,7 @@ Returns output.csv file with arc flows and arc costs for each vehicle class and 
 - Continuously differentiable
 
 ### Arguments
-- `network::String`             : network (availabe at: https://github.com/anmol1104/Freight-EcoRouting/tree/master/src/TA/Network)
+- `network::String`             : network (availabe at: src/TA/Network)
 - `assignment::Symbol=:UE`      : User Equilibrium (UE) or System Optimal (SO) assigment
 - `tol::Float=1e-5`             : tolerance level for relative gap convergence
 - `maxiters::Integer=20`        : maximum number of iterations
@@ -81,4 +81,4 @@ Returns output.csv file with arc flows and arc costs for each vehicle class and 
 
 The analysis and results from this work were presented at Transportation Research Board (TRB) Annual Meeting - 2022. 
 
-To clone and run this project on your local machine refer to Julia documentation: http://pkgdocs.julialang.org/v1/environments/#Using-someone-else's-project 
+To clone and run this project on your local machine refer to Julia documentation.
